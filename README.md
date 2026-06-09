@@ -111,11 +111,20 @@ Open [http://localhost:3000/setup](http://localhost:3000/setup) to create the fi
 
 ## Deploy to Vercel
 
-1. Push the `banner-portal` folder to GitHub
-2. Import the repo in [vercel.com](https://vercel.com)
-3. Add all environment variables from `.env.example`
-4. Set **Node.js version** to 20.x in project settings
-5. Deploy
+1. Import [therealboone/marketbanners](https://github.com/therealboone/marketbanners) in [vercel.com](https://vercel.com)
+2. Add all environment variables from `.env.example`
+3. Set **Node.js version** to **20.x** in project settings
+4. Deploy
+
+### Run database migration (one time)
+
+After adding `DATABASE_URL` in Vercel, run migrations from your machine:
+
+```bash
+DATABASE_URL="your-neon-connection-string" npm run db:deploy
+```
+
+Or paste the SQL from `prisma/migrations/20250609180000_init/migration.sql` into the Neon SQL editor.
 
 After deploy, visit `https://your-domain.com/setup` once to create the admin account.
 
