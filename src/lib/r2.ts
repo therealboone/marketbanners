@@ -32,6 +32,27 @@ export function getPublicAssetUrl(storageKey: string): string {
   return `${base.replace(/\/$/, "")}/${storageKey}`;
 }
 
+export async function uploadObject(
+  storageKey: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  const bucket = process.env.R2_BUCKET_NAME;
+  if (!bucket) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
+  const client = getR2Client();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+      Body: body,
+      ContentType: contentType,
+    }),
+  );
+}
+
 export async function createPresignedUploadUrl(
   storageKey: string,
   contentType: string,

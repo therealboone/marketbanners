@@ -15,4 +15,4 @@ export const ALLOWED_IMAGE_TYPES = [
   "image/webp",
 ] as const;
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // 4 MB (Vercel serverless limit ~4.5 MB)

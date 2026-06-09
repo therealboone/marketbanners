@@ -56,7 +56,7 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
           }
 
           if (file.size > MAX_UPLOAD_BYTES) {
-            throw new Error(`${file.name}: file too large (max 10 MB)`);
+            throw new Error(`${file.name}: file too large (max 4 MB)`);
           }
 
           let width: number | undefined;
@@ -70,68 +70,22 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
             // Optional dimensions
           }
 
-          let presignRes: Response;
-          try {
-            presignRes = await fetch(uploadUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "presign",
-                filename: file.name,
-                mimeType: file.type,
-                fileSize: file.size,
-                width,
-                height,
-              }),
-            });
-          } catch {
-            throw new Error("Could not reach upload API. Check your connection and try again.");
-          }
+          const formData = new FormData();
+          formData.append("file", file);
+          if (width) formData.append("width", String(width));
+          if (height) formData.append("height", String(height));
 
-          if (!presignRes.ok) {
-            const data = await presignRes.json();
-            throw new Error(data.error ?? "Failed to start upload");
-          }
-
-          const { uploadUrl: r2Url, storageKey } = await presignRes.json();
-
-          let uploadRes: Response;
-          try {
-            uploadRes = await fetch(r2Url, {
-              method: "PUT",
-              headers: { "Content-Type": file.type },
-              body: file,
-            });
-          } catch {
-            throw new Error(
-              `${file.name}: upload blocked by R2 CORS. Add a CORS policy to your R2 bucket allowing ${window.location.origin}`,
-            );
-          }
-
-          if (!uploadRes.ok) {
-            throw new Error(`${file.name}: upload to storage failed (${uploadRes.status})`);
-          }
-
-          const confirmRes = await fetch(uploadUrl, {
+          const uploadRes = await fetch(uploadUrl, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "confirm",
-              filename: file.name,
-              storageKey,
-              mimeType: file.type,
-              fileSize: file.size,
-              width,
-              height,
-            }),
+            body: formData,
           });
 
-          if (!confirmRes.ok) {
-            const data = await confirmRes.json();
-            throw new Error(data.error ?? "Failed to save asset");
+          if (!uploadRes.ok) {
+            const data = await uploadRes.json();
+            throw new Error(data.error ?? `${file.name}: upload failed`);
           }
 
-          const asset = await confirmRes.json();
+          const asset = await uploadRes.json();
           onUploaded(asset);
         }
       } catch (err) {
@@ -150,7 +104,7 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
         <span className="text-sm font-medium text-zinc-700">
           {uploading ? "Uploading..." : "Click or drop images to upload"}
         </span>
-        <span className="mt-1 text-xs text-zinc-500">PNG, JPG, GIF, WebP — max 10 MB</span>
+        <span className="mt-1 text-xs text-zinc-500">PNG, JPG, GIF, WebP — max 4 MB</span>
         <input
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp"

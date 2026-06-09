@@ -1,30 +1,10 @@
 import { requireAuth } from "@/lib/api-auth";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
-import {
-  buildStorageKey,
-  createPresignedUploadUrl,
-  getPublicAssetUrl,
-} from "@/lib/r2";
+import { buildStorageKey, getPublicAssetUrl, uploadObject } from "@/lib/r2";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
-const uploadRequestSchema = z.object({
-  filename: z.string().min(1),
-  mimeType: z.string().min(1),
-  fileSize: z.number().int().positive(),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-});
-
-const confirmSchema = z.object({
-  filename: z.string().min(1),
-  storageKey: z.string().min(1),
-  mimeType: z.string().min(1),
-  fileSize: z.number().int().positive(),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-});
+export const runtime = "nodejs";
 
 export async function GET(
   _request: Request,
@@ -72,7 +52,6 @@ export async function POST(
   if (error) return error;
 
   const { clientId, campaignId, folderId } = await params;
-  const body = await request.json();
 
   const folder = await prisma.folder.findFirst({
     where: { id: folderId, campaignId, campaign: { clientId } },
@@ -83,58 +62,52 @@ export async function POST(
     return NextResponse.json({ error: "Folder not found" }, { status: 404 });
   }
 
-  // Step 1: request presigned upload URL
-  if (body.action === "presign") {
-    try {
-      const parsed = uploadRequestSchema.safeParse(body);
-      if (!parsed.success) {
-        return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-      }
-
-      const { filename, mimeType, fileSize } = parsed.data;
-
-      if (!ALLOWED_IMAGE_TYPES.includes(mimeType as (typeof ALLOWED_IMAGE_TYPES)[number])) {
-        return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
-      }
-
-      if (fileSize > MAX_UPLOAD_BYTES) {
-        return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
-      }
-
-      const storageKey = buildStorageKey(
-        folder.campaign.client.slug,
-        folder.campaign.slug,
-        folderId,
-        filename,
-      );
-
-      const uploadUrl = await createPresignedUploadUrl(storageKey, mimeType, fileSize);
-
-      return NextResponse.json({ uploadUrl, storageKey });
-    } catch (err) {
-      console.error("Presign failed:", err);
-      return NextResponse.json(
-        { error: "Storage not configured. Check R2 environment variables in Vercel." },
-        { status: 500 },
-      );
-    }
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.includes("multipart/form-data")) {
+    return NextResponse.json({ error: "Expected multipart form upload" }, { status: 400 });
   }
 
-  // Step 2: confirm upload and save to database
-  if (body.action === "confirm") {
-    const parsed = confirmSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
+      return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ error: "File too large (max 4 MB)" }, { status: 400 });
+    }
+
+    const widthRaw = formData.get("width");
+    const heightRaw = formData.get("height");
+    const width =
+      typeof widthRaw === "string" && widthRaw ? parseInt(widthRaw, 10) : undefined;
+    const height =
+      typeof heightRaw === "string" && heightRaw ? parseInt(heightRaw, 10) : undefined;
+
+    const storageKey = buildStorageKey(
+      folder.campaign.client.slug,
+      folder.campaign.slug,
+      folderId,
+      file.name,
+    );
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await uploadObject(storageKey, buffer, file.type);
 
     const asset = await prisma.asset.create({
       data: {
-        filename: parsed.data.filename,
-        storageKey: parsed.data.storageKey,
-        mimeType: parsed.data.mimeType,
-        fileSize: parsed.data.fileSize,
-        width: parsed.data.width,
-        height: parsed.data.height,
+        filename: file.name,
+        storageKey,
+        mimeType: file.type,
+        fileSize: file.size,
+        width: Number.isFinite(width) ? width : undefined,
+        height: Number.isFinite(height) ? height : undefined,
         folderId,
       },
     });
@@ -146,7 +119,11 @@ export async function POST(
       },
       { status: 201 },
     );
+  } catch (err) {
+    console.error("Upload failed:", err);
+    return NextResponse.json(
+      { error: "Upload failed. Check R2 environment variables in Vercel." },
+      { status: 500 },
+    );
   }
-
-  return NextResponse.json({ error: "Invalid action" }, { status: 400 });
 }
