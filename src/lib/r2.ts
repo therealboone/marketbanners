@@ -47,7 +47,6 @@ export async function createPresignedUploadUrl(
     Bucket: bucket,
     Key: storageKey,
     ContentType: contentType,
-    ContentLength: fileSize,
   });
 
   return getSignedUrl(client, command, { expiresIn: 600 });

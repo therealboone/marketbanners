@@ -85,31 +85,39 @@ export async function POST(
 
   // Step 1: request presigned upload URL
   if (body.action === "presign") {
-    const parsed = uploadRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    try {
+      const parsed = uploadRequestSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      }
+
+      const { filename, mimeType, fileSize } = parsed.data;
+
+      if (!ALLOWED_IMAGE_TYPES.includes(mimeType as (typeof ALLOWED_IMAGE_TYPES)[number])) {
+        return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
+      }
+
+      if (fileSize > MAX_UPLOAD_BYTES) {
+        return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
+      }
+
+      const storageKey = buildStorageKey(
+        folder.campaign.client.slug,
+        folder.campaign.slug,
+        folderId,
+        filename,
+      );
+
+      const uploadUrl = await createPresignedUploadUrl(storageKey, mimeType, fileSize);
+
+      return NextResponse.json({ uploadUrl, storageKey });
+    } catch (err) {
+      console.error("Presign failed:", err);
+      return NextResponse.json(
+        { error: "Storage not configured. Check R2 environment variables in Vercel." },
+        { status: 500 },
+      );
     }
-
-    const { filename, mimeType, fileSize } = parsed.data;
-
-    if (!ALLOWED_IMAGE_TYPES.includes(mimeType as (typeof ALLOWED_IMAGE_TYPES)[number])) {
-      return NextResponse.json({ error: "Unsupported file type" }, { status: 400 });
-    }
-
-    if (fileSize > MAX_UPLOAD_BYTES) {
-      return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
-    }
-
-    const storageKey = buildStorageKey(
-      folder.campaign.client.slug,
-      folder.campaign.slug,
-      folderId,
-      filename,
-    );
-
-    const uploadUrl = await createPresignedUploadUrl(storageKey, mimeType, fileSize);
-
-    return NextResponse.json({ uploadUrl, storageKey });
   }
 
   // Step 2: confirm upload and save to database

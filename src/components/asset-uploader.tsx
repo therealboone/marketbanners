@@ -70,18 +70,23 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
             // Optional dimensions
           }
 
-          const presignRes = await fetch(uploadUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              action: "presign",
-              filename: file.name,
-              mimeType: file.type,
-              fileSize: file.size,
-              width,
-              height,
-            }),
-          });
+          let presignRes: Response;
+          try {
+            presignRes = await fetch(uploadUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "presign",
+                filename: file.name,
+                mimeType: file.type,
+                fileSize: file.size,
+                width,
+                height,
+              }),
+            });
+          } catch {
+            throw new Error("Could not reach upload API. Check your connection and try again.");
+          }
 
           if (!presignRes.ok) {
             const data = await presignRes.json();
@@ -90,14 +95,21 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
 
           const { uploadUrl: r2Url, storageKey } = await presignRes.json();
 
-          const uploadRes = await fetch(r2Url, {
-            method: "PUT",
-            headers: { "Content-Type": file.type },
-            body: file,
-          });
+          let uploadRes: Response;
+          try {
+            uploadRes = await fetch(r2Url, {
+              method: "PUT",
+              headers: { "Content-Type": file.type },
+              body: file,
+            });
+          } catch {
+            throw new Error(
+              `${file.name}: upload blocked by R2 CORS. Add a CORS policy to your R2 bucket allowing ${window.location.origin}`,
+            );
+          }
 
           if (!uploadRes.ok) {
-            throw new Error(`${file.name}: upload failed`);
+            throw new Error(`${file.name}: upload to storage failed (${uploadRes.status})`);
           }
 
           const confirmRes = await fetch(uploadUrl, {
