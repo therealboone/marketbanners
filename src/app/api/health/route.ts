@@ -16,10 +16,31 @@ export async function GET() {
 
   try {
     await prisma.$queryRaw`SELECT 1`;
+
+    const tables = await prisma.$queryRaw<{ table_name: string }[]>`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `;
+
+    const tableNames = tables.map((t) => t.table_name);
+    const hasUserTable = tableNames.includes("User");
+
+    let userCount: number | null = null;
+    if (hasUserTable) {
+      userCount = await prisma.user.count();
+    }
+
     return NextResponse.json({
-      ok: true,
+      ok: hasUserTable,
       hasDatabaseUrl: true,
-      database: "connected",
+      database: hasUserTable ? "connected" : "connected but tables missing",
+      tables: tableNames,
+      userCount,
+      hint: hasUserTable
+        ? null
+        : "Run migration SQL in the same Neon project/branch as DATABASE_URL",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
