@@ -1,7 +1,7 @@
 import { requireAuth } from "@/lib/api-auth";
 import { ALLOWED_IMAGE_TYPES, MAX_UPLOAD_BYTES } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
-import { buildStorageKey, getPublicAssetUrl, uploadObject } from "@/lib/r2";
+import { buildStorageKey, formatR2Error, getPublicAssetUrl, uploadObject } from "@/lib/r2";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -121,9 +121,6 @@ export async function POST(
     );
   } catch (err) {
     console.error("Upload failed:", err);
-    return NextResponse.json(
-      { error: "Upload failed. Check R2 environment variables in Vercel." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: formatR2Error(err) }, { status: 500 });
   }
 }
