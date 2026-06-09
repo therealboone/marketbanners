@@ -1,26 +1,42 @@
 import {
   DeleteObjectCommand,
+  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+function env(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
 export function getR2ConfigStatus() {
+  let endpoint: string | null = null;
+  try {
+    endpoint = getR2Endpoint();
+  } catch {
+    // R2_ACCOUNT_ID missing
+  }
+
   return {
-    hasAccountId: Boolean(process.env.R2_ACCOUNT_ID),
-    hasAccessKeyId: Boolean(process.env.R2_ACCESS_KEY_ID),
-    hasSecretAccessKey: Boolean(process.env.R2_SECRET_ACCESS_KEY),
-    hasBucketName: Boolean(process.env.R2_BUCKET_NAME),
-    hasPublicUrl: Boolean(process.env.R2_PUBLIC_URL),
+    hasAccountId: Boolean(env("R2_ACCOUNT_ID")),
+    hasAccessKeyId: Boolean(env("R2_ACCESS_KEY_ID")),
+    hasSecretAccessKey: Boolean(env("R2_SECRET_ACCESS_KEY")),
+    hasBucketName: Boolean(env("R2_BUCKET_NAME")),
+    hasPublicUrl: Boolean(env("R2_PUBLIC_URL")),
+    bucketName: env("R2_BUCKET_NAME") ?? null,
+    endpoint,
   };
 }
 
 function getR2Endpoint(): string {
-  if (process.env.R2_ENDPOINT) {
-    return process.env.R2_ENDPOINT.replace(/\/$/, "");
+  const endpoint = env("R2_ENDPOINT");
+  if (endpoint) {
+    return endpoint.replace(/\/$/, "");
   }
 
-  const accountId = process.env.R2_ACCOUNT_ID;
+  const accountId = env("R2_ACCOUNT_ID");
   if (!accountId) {
     throw new Error("R2_ACCOUNT_ID is not configured");
   }
@@ -29,8 +45,8 @@ function getR2Endpoint(): string {
 }
 
 function getR2Client() {
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  const accessKeyId = env("R2_ACCESS_KEY_ID");
+  const secretAccessKey = env("R2_SECRET_ACCESS_KEY");
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error("R2 access keys are not configured");
@@ -68,15 +84,21 @@ export function formatR2Error(err: unknown): string {
   if (message.includes("SignatureDoesNotMatch")) {
     return "R2_SECRET_ACCESS_KEY is wrong. Re-copy it from your R2 API token.";
   }
-  if (message.includes("AccessDenied") || message.includes("403")) {
-    return "R2 token lacks permission. Create a token with Object Read & Write for this bucket.";
+  if (
+    message.includes("AccessDenied") ||
+    message.includes("Access Denied") ||
+    message.includes("403")
+  ) {
+    const bucket = env("R2_BUCKET_NAME");
+    const bucketHint = bucket ? ` for bucket "${bucket}"` : " for this bucket";
+    return `R2 access denied${bucketHint}. Usually the API token is scoped to a different bucket than R2_BUCKET_NAME, or Vercel still has access keys from an older token. Recreate the token for this exact bucket, update both keys in Vercel, and redeploy.`;
   }
 
   return `R2 upload failed: ${message}`;
 }
 
 export function getPublicAssetUrl(storageKey: string): string {
-  const base = process.env.R2_PUBLIC_URL;
+  const base = env("R2_PUBLIC_URL");
   if (!base) {
     throw new Error("R2_PUBLIC_URL is not configured");
   }
@@ -88,7 +110,7 @@ export async function uploadObject(
   body: Buffer,
   contentType: string,
 ): Promise<void> {
-  const bucket = process.env.R2_BUCKET_NAME;
+  const bucket = env("R2_BUCKET_NAME");
   if (!bucket) {
     throw new Error("R2_BUCKET_NAME is not configured");
   }
@@ -104,24 +126,103 @@ export async function uploadObject(
   );
 }
 
-export async function testR2Connection(): Promise<{ ok: boolean; error?: string }> {
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function isAccessDenied(err: unknown): boolean {
+  const message = errorMessage(err);
+  return (
+    message.includes("AccessDenied") ||
+    message.includes("Access Denied") ||
+    message.includes("403")
+  );
+}
+
+export async function testR2Connection(): Promise<{
+  ok: boolean;
+  error?: string;
+  diagnostics?: {
+    bucketName: string;
+    endpoint: string;
+    headBucket: "ok" | "denied" | "not_found" | "error";
+    putObject: "ok" | "denied" | "error";
+  };
+}> {
   const config = getR2ConfigStatus();
   const missing = Object.entries(config)
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
+    .filter(([key, value]) => key.startsWith("has") && !value)
+    .map(([key]) => key.replace(/^has/, "").replace(/^(.)/, (m) => m.toLowerCase()));
 
   if (missing.length > 0) {
     return { ok: false, error: `Missing R2 config: ${missing.join(", ")}` };
   }
 
+  const bucket = env("R2_BUCKET_NAME")!;
+  const endpoint = getR2Endpoint();
+  const client = getR2Client();
+  const diagnostics: {
+    bucketName: string;
+    endpoint: string;
+    headBucket: "ok" | "denied" | "not_found" | "error";
+    putObject: "ok" | "denied" | "error";
+  } = {
+    bucketName: bucket,
+    endpoint,
+    headBucket: "error",
+    putObject: "error",
+  };
+
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
+    diagnostics.headBucket = "ok";
+  } catch (err) {
+    const message = errorMessage(err);
+    if (message.includes("NoSuchBucket") || message.includes("Bucket not found")) {
+      diagnostics.headBucket = "not_found";
+      return {
+        ok: false,
+        error: `R2 bucket "${bucket}" not found at ${endpoint}. Check R2_BUCKET_NAME and R2_ACCOUNT_ID match the bucket in Cloudflare.`,
+        diagnostics,
+      };
+    }
+    if (isAccessDenied(err)) {
+      diagnostics.headBucket = "denied";
+      return {
+        ok: false,
+        error: `R2 access denied for bucket "${bucket}". The API token is likely scoped to a different bucket than R2_BUCKET_NAME in Vercel.`,
+        diagnostics,
+      };
+    }
+    diagnostics.headBucket = "error";
+    return { ok: false, error: formatR2Error(err), diagnostics };
+  }
+
   const key = `.__healthcheck-${Date.now()}`;
 
   try {
-    await uploadObject(key, Buffer.from("ok"), "text/plain");
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: Buffer.from("ok"),
+        ContentType: "text/plain",
+      }),
+    );
+    diagnostics.putObject = "ok";
     await deleteObject(key);
-    return { ok: true };
+    return { ok: true, diagnostics };
   } catch (err) {
-    return { ok: false, error: formatR2Error(err) };
+    if (isAccessDenied(err)) {
+      diagnostics.putObject = "denied";
+      return {
+        ok: false,
+        error: `R2 can reach bucket "${bucket}" but write is denied. Vercel may still be using access keys from an older token — update R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and redeploy.`,
+        diagnostics,
+      };
+    }
+    diagnostics.putObject = "error";
+    return { ok: false, error: formatR2Error(err), diagnostics };
   }
 }
 
@@ -130,7 +231,7 @@ export async function createPresignedUploadUrl(
   contentType: string,
   _fileSize: number,
 ): Promise<string> {
-  const bucket = process.env.R2_BUCKET_NAME;
+  const bucket = env("R2_BUCKET_NAME");
   if (!bucket) {
     throw new Error("R2_BUCKET_NAME is not configured");
   }
@@ -146,7 +247,7 @@ export async function createPresignedUploadUrl(
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {
-  const bucket = process.env.R2_BUCKET_NAME;
+  const bucket = env("R2_BUCKET_NAME");
   if (!bucket) {
     throw new Error("R2_BUCKET_NAME is not configured");
   }

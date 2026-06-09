@@ -11,6 +11,7 @@ export async function GET() {
     ok: result.ok,
     config,
     storage: result.ok ? "connected" : "failed",
+    diagnostics: result.diagnostics ?? null,
     error: result.error ?? null,
   });
 }

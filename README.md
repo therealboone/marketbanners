@@ -67,6 +67,10 @@ You already have R2. You'll need:
 
 **Enable public access** on the bucket (or attach a custom domain) so clients can view images in the gallery.
 
+**New bucket?** R2 API tokens can be scoped to specific buckets. If you switch buckets, create a **new** R2 API token with **Object Read & Write** permission for the new bucket name, update `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in Vercel, and redeploy. Updating `R2_BUCKET_NAME` alone is not enough if the token is scoped to the old bucket.
+
+**Verify storage** after deploy: visit `/api/health/storage` — it runs a test upload and reports which bucket name is configured.
+
 **CORS** — add this CORS policy to your R2 bucket so browser uploads work:
 
 ```json

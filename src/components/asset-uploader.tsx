@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Upload, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
+function preventFileDropDefaults(event: React.DragEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
 type UploadedAsset = {
   id: string;
   filename: string;
@@ -41,6 +46,7 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
 export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
@@ -99,7 +105,30 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
 
   return (
     <div className="space-y-4">
-      <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-50 px-6 py-10 transition hover:border-zinc-400 hover:bg-zinc-100">
+      <label
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 transition ${
+          dragging
+            ? "border-zinc-500 bg-zinc-100"
+            : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100"
+        }`}
+        onDragEnter={(event) => {
+          preventFileDropDefaults(event);
+          setDragging(true);
+        }}
+        onDragOver={preventFileDropDefaults}
+        onDragLeave={(event) => {
+          preventFileDropDefaults(event);
+          if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+          setDragging(false);
+        }}
+        onDrop={(event) => {
+          preventFileDropDefaults(event);
+          setDragging(false);
+          if (!uploading) {
+            void handleFiles(event.dataTransfer.files);
+          }
+        }}
+      >
         <Upload className="mb-2 h-8 w-8 text-zinc-400" />
         <span className="text-sm font-medium text-zinc-700">
           {uploading ? "Uploading..." : "Click or drop images to upload"}
