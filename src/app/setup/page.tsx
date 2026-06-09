@@ -19,8 +19,19 @@ export default function SetupPage() {
 
   useEffect(() => {
     void fetch("/api/setup")
-      .then((r) => r.json())
-      .then((data) => setAllowed(data.needsSetup));
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(data.error ?? "Failed to check setup status");
+        }
+        setAllowed(data.needsSetup);
+      })
+      .catch(() => {
+        setError(
+          "Could not reach the database. Run the migration first (npm run db:deploy), then refresh.",
+        );
+        setAllowed(false);
+      });
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -58,7 +69,11 @@ export default function SetupPage() {
       <div className="flex min-h-screen items-center justify-center px-4">
         <Card className="w-full max-w-md">
           <CardBody className="text-center">
-            <p className="text-sm text-zinc-600">Setup has already been completed.</p>
+            {error ? (
+              <p className="text-sm text-red-700">{error}</p>
+            ) : (
+              <p className="text-sm text-zinc-600">Setup has already been completed.</p>
+            )}
             <Link href="/login" className="mt-4 inline-block text-sm font-medium underline">
               Go to login
             </Link>
