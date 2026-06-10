@@ -3,6 +3,7 @@
 import { AppShell } from "@/components/app-shell";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { FolderBrowser } from "@/components/folder-browser";
+import { GalleryBrandFooter, GalleryBrandNav } from "@/components/gallery-chrome";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Lightbox from "yet-another-react-lightbox";
@@ -75,21 +76,29 @@ function PublicGalleryContent() {
 
   if (loading) {
     return (
-      <AppShell className="type-caption flex min-h-screen items-center justify-center">
-        Loading gallery...
+      <AppShell>
+        <GalleryBrandNav />
+        <div className="type-caption flex min-h-[60vh] items-center justify-center">
+          Loading gallery...
+        </div>
+        <GalleryBrandFooter />
       </AppShell>
     );
   }
 
   if (error || !data) {
     return (
-      <AppShell className="flex min-h-screen items-center justify-center px-4">
-        <div className="text-center">
-          <h1 className="type-h1">Gallery not found</h1>
-          <p className="type-caption mt-2">
-            This link may be incorrect or the campaign has been removed.
-          </p>
+      <AppShell>
+        <GalleryBrandNav />
+        <div className="flex min-h-[60vh] items-center justify-center px-4">
+          <div className="text-center">
+            <h1 className="type-h1">Gallery not found</h1>
+            <p className="type-caption mt-2">
+              This link may be incorrect or the campaign has been removed.
+            </p>
+          </div>
         </div>
+        <GalleryBrandFooter />
       </AppShell>
     );
   }
@@ -102,25 +111,29 @@ function PublicGalleryContent() {
 
   return (
     <AppShell>
-      <header className="glass-nav border-b">
-        <div className="mx-auto max-w-6xl px-4 py-8">
+      <GalleryBrandNav />
+
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <header className="page-header">
           <p className="type-overline">{data.campaign.client.name}</p>
-          <h1 className="type-display mt-1">{data.campaign.name}</h1>
-          <div className="mt-3">
+          <h1 className="page-header__title mt-1">{data.campaign.name}</h1>
+          <div className="mt-4">
             <Breadcrumbs items={data.breadcrumbs} onNavigate={navigateToFolder} />
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <FolderBrowser
-          folders={data.folders}
-          assets={data.assets}
-          onOpenFolder={navigateToFolder}
-          onOpenAsset={setLightboxIndex}
-          emptyMessage="No banners in this folder yet."
-        />
-      </main>
+        <main>
+          <FolderBrowser
+            folders={data.folders}
+            assets={data.assets}
+            onOpenFolder={navigateToFolder}
+            onOpenAsset={setLightboxIndex}
+            emptyMessage="No banners in this folder yet."
+          />
+        </main>
+      </div>
+
+      <GalleryBrandFooter />
 
       <Lightbox
         open={lightboxIndex >= 0}
@@ -136,8 +149,12 @@ export default function PublicGalleryPage() {
   return (
     <Suspense
       fallback={
-        <AppShell className="type-caption flex min-h-screen items-center justify-center">
-          Loading gallery...
+        <AppShell>
+          <GalleryBrandNav />
+          <div className="type-caption flex min-h-[60vh] items-center justify-center">
+            Loading gallery...
+          </div>
+          <GalleryBrandFooter />
         </AppShell>
       }
     >
