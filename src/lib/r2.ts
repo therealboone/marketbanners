@@ -11,6 +11,12 @@ function env(name: string): string | undefined {
   return value || undefined;
 }
 
+type R2Transport = "rest" | "s3";
+
+function getR2Transport(): R2Transport {
+  return env("CLOUDFLARE_API_TOKEN") ? "rest" : "s3";
+}
+
 export function getR2ConfigStatus() {
   let endpoint: string | null = null;
   try {
@@ -25,6 +31,8 @@ export function getR2ConfigStatus() {
     hasSecretAccessKey: Boolean(env("R2_SECRET_ACCESS_KEY")),
     hasBucketName: Boolean(env("R2_BUCKET_NAME")),
     hasPublicUrl: Boolean(env("R2_PUBLIC_URL")),
+    hasCloudflareApiToken: Boolean(env("CLOUDFLARE_API_TOKEN")),
+    transport: getR2Transport(),
     bucketName: env("R2_BUCKET_NAME") ?? null,
     endpoint,
   };
@@ -63,6 +71,93 @@ function getR2Client() {
   });
 }
 
+function encodeObjectKey(storageKey: string): string {
+  return storageKey.split("/").map(encodeURIComponent).join("/");
+}
+
+function restObjectUrl(storageKey: string): string {
+  const accountId = env("R2_ACCOUNT_ID");
+  const bucket = env("R2_BUCKET_NAME");
+  if (!accountId) {
+    throw new Error("R2_ACCOUNT_ID is not configured");
+  }
+  if (!bucket) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKey(storageKey)}`;
+}
+
+function restBucketUrl(): string {
+  const accountId = env("R2_ACCOUNT_ID");
+  const bucket = env("R2_BUCKET_NAME");
+  if (!accountId) {
+    throw new Error("R2_ACCOUNT_ID is not configured");
+  }
+  if (!bucket) {
+    throw new Error("R2_BUCKET_NAME is not configured");
+  }
+
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}`;
+}
+
+async function parseRestError(response: Response): Promise<string> {
+  let detail = `HTTP ${response.status}`;
+  try {
+    const data = (await response.json()) as {
+      errors?: Array<{ message?: string }>;
+    };
+    if (data.errors?.length) {
+      detail = data.errors.map((error) => error.message ?? "Unknown error").join("; ");
+    }
+  } catch {
+    const text = await response.text();
+    if (text) detail = `${detail}: ${text}`;
+  }
+  return detail;
+}
+
+async function restRequest(
+  method: "PUT" | "DELETE" | "GET",
+  url: string,
+  body?: Buffer,
+  contentType?: string,
+): Promise<void> {
+  const token = env("CLOUDFLARE_API_TOKEN");
+  if (!token) {
+    throw new Error("CLOUDFLARE_API_TOKEN is not configured");
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  if (contentType) {
+    headers["Content-Type"] = contentType;
+  }
+
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: body ?? undefined,
+  });
+
+  if (!response.ok) {
+    throw new Error(`R2 REST ${method} failed: ${await parseRestError(response)}`);
+  }
+}
+
+async function uploadObjectViaRest(
+  storageKey: string,
+  body: Buffer,
+  contentType: string,
+): Promise<void> {
+  await restRequest("PUT", restObjectUrl(storageKey), body, contentType);
+}
+
+async function deleteObjectViaRest(storageKey: string): Promise<void> {
+  await restRequest("DELETE", restObjectUrl(storageKey));
+}
+
 export function formatR2Error(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
 
@@ -71,6 +166,9 @@ export function formatR2Error(err: unknown): string {
   }
   if (message.includes("R2_BUCKET_NAME")) {
     return "R2_BUCKET_NAME is missing in Vercel environment variables.";
+  }
+  if (message.includes("CLOUDFLARE_API_TOKEN")) {
+    return "CLOUDFLARE_API_TOKEN is missing. Create a Cloudflare API token with Account → Workers R2 Storage → Edit permission.";
   }
   if (message.includes("access keys")) {
     return "R2_ACCESS_KEY_ID or R2_SECRET_ACCESS_KEY is missing in Vercel.";
@@ -91,7 +189,18 @@ export function formatR2Error(err: unknown): string {
   ) {
     const bucket = env("R2_BUCKET_NAME");
     const bucketHint = bucket ? ` for bucket "${bucket}"` : " for this bucket";
+    if (getR2Transport() === "rest") {
+      return `R2 access denied${bucketHint}. Check CLOUDFLARE_API_TOKEN has Account → Workers R2 Storage → Edit for this account.`;
+    }
     return `R2 access denied${bucketHint}. Usually the API token is scoped to a different bucket than R2_BUCKET_NAME, or Vercel still has access keys from an older token. Recreate the token for this exact bucket, update both keys in Vercel, and redeploy.`;
+  }
+  if (
+    message.includes("EPROTO") ||
+    message.includes("handshake failure") ||
+    message.includes("SSL alert number 40")
+  ) {
+    const endpoint = getR2ConfigStatus().endpoint ?? "your R2 S3 endpoint";
+    return `R2 S3 endpoint TLS handshake failed (${endpoint}). Add CLOUDFLARE_API_TOKEN to Vercel to use Cloudflare's REST API instead, or contact Cloudflare support to fix the S3 endpoint for your account.`;
   }
 
   return `R2 upload failed: ${message}`;
@@ -110,6 +219,11 @@ export async function uploadObject(
   body: Buffer,
   contentType: string,
 ): Promise<void> {
+  if (getR2Transport() === "rest") {
+    await uploadObjectViaRest(storageKey, body, contentType);
+    return;
+  }
+
   const bucket = env("R2_BUCKET_NAME");
   if (!bucket) {
     throw new Error("R2_BUCKET_NAME is not configured");
@@ -139,38 +253,125 @@ function isAccessDenied(err: unknown): boolean {
   );
 }
 
+function isTlsHandshakeFailure(err: unknown): boolean {
+  const message = errorMessage(err);
+  return (
+    message.includes("EPROTO") ||
+    message.includes("handshake failure") ||
+    message.includes("SSL alert number 40")
+  );
+}
+
+async function testR2ConnectionViaRest(): Promise<{
+  ok: boolean;
+  error?: string;
+  diagnostics?: {
+    bucketName: string;
+    endpoint: string;
+    transport: R2Transport;
+    headBucket: "ok" | "denied" | "not_found" | "error";
+    putObject: "ok" | "denied" | "error";
+  };
+}> {
+  const bucket = env("R2_BUCKET_NAME")!;
+  const diagnostics = {
+    bucketName: bucket,
+    endpoint: "https://api.cloudflare.com/client/v4",
+    transport: "rest" as const,
+    headBucket: "error" as const,
+    putObject: "error" as const,
+  };
+
+  try {
+    await restRequest("GET", restBucketUrl());
+    diagnostics.headBucket = "ok";
+  } catch (err) {
+    const message = errorMessage(err);
+    if (message.includes("not found") || message.includes("10004")) {
+      diagnostics.headBucket = "not_found";
+      return {
+        ok: false,
+        error: `R2 bucket "${bucket}" not found. Check R2_BUCKET_NAME and R2_ACCOUNT_ID.`,
+        diagnostics,
+      };
+    }
+    if (isAccessDenied(err)) {
+      diagnostics.headBucket = "denied";
+      return {
+        ok: false,
+        error: `R2 access denied for bucket "${bucket}". Check CLOUDFLARE_API_TOKEN has Workers R2 Storage Edit permission.`,
+        diagnostics,
+      };
+    }
+    diagnostics.headBucket = "error";
+    return { ok: false, error: formatR2Error(err), diagnostics };
+  }
+
+  const key = `.__healthcheck-${Date.now()}`;
+
+  try {
+    await uploadObjectViaRest(key, Buffer.from("ok"), "text/plain");
+    diagnostics.putObject = "ok";
+    await deleteObjectViaRest(key);
+    return { ok: true, diagnostics };
+  } catch (err) {
+    if (isAccessDenied(err)) {
+      diagnostics.putObject = "denied";
+      return {
+        ok: false,
+        error: `R2 can reach bucket "${bucket}" but write is denied. Check CLOUDFLARE_API_TOKEN permissions.`,
+        diagnostics,
+      };
+    }
+    diagnostics.putObject = "error";
+    return { ok: false, error: formatR2Error(err), diagnostics };
+  }
+}
+
 export async function testR2Connection(): Promise<{
   ok: boolean;
   error?: string;
   diagnostics?: {
     bucketName: string;
     endpoint: string;
+    transport: R2Transport;
     headBucket: "ok" | "denied" | "not_found" | "error";
     putObject: "ok" | "denied" | "error";
   };
 }> {
+  const transport = getR2Transport();
   const config = getR2ConfigStatus();
-  const missing = Object.entries(config)
-    .filter(([key, value]) => key.startsWith("has") && !value)
-    .map(([key]) => key.replace(/^has/, "").replace(/^(.)/, (m) => m.toLowerCase()));
+
+  const required =
+    transport === "rest"
+      ? (["hasAccountId", "hasBucketName", "hasCloudflareApiToken"] as const)
+      : ([
+          "hasAccountId",
+          "hasAccessKeyId",
+          "hasSecretAccessKey",
+          "hasBucketName",
+          "hasPublicUrl",
+        ] as const);
+
+  const missing = required.filter((key) => !config[key]).map((key) => key.replace(/^has/, "").replace(/^(.)/, (m) => m.toLowerCase()));
 
   if (missing.length > 0) {
     return { ok: false, error: `Missing R2 config: ${missing.join(", ")}` };
   }
 
+  if (transport === "rest") {
+    return testR2ConnectionViaRest();
+  }
+
   const bucket = env("R2_BUCKET_NAME")!;
   const endpoint = getR2Endpoint();
   const client = getR2Client();
-  const diagnostics: {
-    bucketName: string;
-    endpoint: string;
-    headBucket: "ok" | "denied" | "not_found" | "error";
-    putObject: "ok" | "denied" | "error";
-  } = {
+  const diagnostics = {
     bucketName: bucket,
     endpoint,
-    headBucket: "error",
-    putObject: "error",
+    transport: "s3" as const,
+    headBucket: "error" as const,
+    putObject: "error" as const,
   };
 
   try {
@@ -191,6 +392,14 @@ export async function testR2Connection(): Promise<{
       return {
         ok: false,
         error: `R2 access denied for bucket "${bucket}". The API token is likely scoped to a different bucket than R2_BUCKET_NAME in Vercel.`,
+        diagnostics,
+      };
+    }
+    if (isTlsHandshakeFailure(err)) {
+      diagnostics.headBucket = "error";
+      return {
+        ok: false,
+        error: formatR2Error(err),
         diagnostics,
       };
     }
@@ -247,6 +456,11 @@ export async function createPresignedUploadUrl(
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {
+  if (getR2Transport() === "rest") {
+    await deleteObjectViaRest(storageKey);
+    return;
+  }
+
   const bucket = env("R2_BUCKET_NAME");
   if (!bucket) {
     throw new Error("R2_BUCKET_NAME is not configured");

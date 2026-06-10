@@ -71,6 +71,8 @@ You already have R2. You'll need:
 
 **Verify storage** after deploy: visit `/api/health/storage` — it runs a test upload and reports which bucket name is configured.
 
+**S3 TLS handshake failure?** If uploads fail with `EPROTO` / `SSL alert number 40`, your account's R2 S3 endpoint may not be provisioned. Add `CLOUDFLARE_API_TOKEN` (My Profile → API Tokens → Custom token → Account → **Workers R2 Storage** → **Edit**) and redeploy — the app will use Cloudflare's REST API instead.
+
 **CORS** — add this CORS policy to your R2 bucket so browser uploads work:
 
 ```json
