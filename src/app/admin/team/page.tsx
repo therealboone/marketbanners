@@ -71,13 +71,13 @@ export default function TeamPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Team</h1>
-        <p className="mt-1 text-sm text-zinc-500">Invite team members to the admin portal</p>
+        <h1 className="page-header__title">Team</h1>
+        <p className="page-header__subtitle">Invite team members to the admin portal</p>
       </div>
 
       <Card>
         <CardHeader>
-          <h2 className="font-medium">Invite a team member</h2>
+          <h2 className="type-h2">Invite a team member</h2>
         </CardHeader>
         <CardBody className="space-y-4">
           <form onSubmit={handleInvite} className="flex flex-col gap-3 sm:flex-row">
@@ -95,13 +95,13 @@ export default function TeamPage() {
           </form>
 
           {error && (
-            <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div className="alert-error">{error}</div>
           )}
 
           {lastInviteUrl && (
-            <div className="rounded-lg bg-green-50 px-4 py-3">
-              <p className="text-sm font-medium text-green-800">Invite link created</p>
-              <p className="mt-1 break-all text-sm text-green-700">{lastInviteUrl}</p>
+            <div className="alert-success">
+              <p className="font-medium">Invite link created</p>
+              <p className="mt-1 break-all opacity-90">{lastInviteUrl}</p>
               <Button variant="secondary" size="sm" className="mt-2" onClick={copyInviteUrl}>
                 <Copy className="mr-1 h-4 w-4" />
                 {copied ? "Copied!" : "Copy link"}
@@ -113,20 +113,20 @@ export default function TeamPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="font-medium">Recent invites</h2>
+          <h2 className="type-h2">Recent invites</h2>
         </CardHeader>
         <CardBody>
           {loading ? (
-            <p className="text-sm text-zinc-500">Loading...</p>
+            <p className="type-caption">Loading...</p>
           ) : invites.length === 0 ? (
-            <p className="text-sm text-zinc-500">No invites yet.</p>
+            <p className="type-caption">No invites yet.</p>
           ) : (
-            <div className="divide-y divide-zinc-100">
+            <div className="divide-y divide-white/10">
               {invites.map((invite) => (
-                <div key={invite.id} className="flex items-center justify-between py-3 text-sm">
+                <div key={invite.id} className="type-body-sm flex items-center justify-between py-3">
                   <div>
-                    <p className="font-medium">{invite.email}</p>
-                    <p className="text-xs text-zinc-500">
+                    <p className="type-h3">{invite.email}</p>
+                    <p className="type-caption">
                       {invite.usedAt
                         ? "Accepted"
                         : new Date(invite.expiresAt) < new Date()
@@ -134,7 +134,7 @@ export default function TeamPage() {
                           : "Pending"}
                     </p>
                   </div>
-                  <p className="text-xs text-zinc-400">
+                  <p className="type-caption opacity-70">
                     {new Date(invite.createdAt).toLocaleDateString()}
                   </p>
                 </div>

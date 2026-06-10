@@ -1,5 +1,6 @@
 "use client";
 
+import { AppShell } from "@/components/app-shell";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { FolderBrowser } from "@/components/folder-browser";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -74,22 +75,22 @@ function PublicGalleryContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">
+      <AppShell className="type-caption flex min-h-screen items-center justify-center">
         Loading gallery...
-      </div>
+      </AppShell>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <AppShell className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center">
-          <h1 className="text-xl font-semibold">Gallery not found</h1>
-          <p className="mt-2 text-sm text-zinc-500">
+          <h1 className="type-h1">Gallery not found</h1>
+          <p className="type-caption mt-2">
             This link may be incorrect or the campaign has been removed.
           </p>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
@@ -100,18 +101,18 @@ function PublicGalleryContent() {
   }));
 
   return (
-    <div className="min-h-screen bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-6">
-          <p className="text-sm font-medium text-zinc-500">{data.campaign.client.name}</p>
-          <h1 className="mt-1 text-2xl font-semibold">{data.campaign.name}</h1>
+    <AppShell>
+      <header className="glass-nav border-b">
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <p className="type-overline">{data.campaign.client.name}</p>
+          <h1 className="type-display mt-1">{data.campaign.name}</h1>
           <div className="mt-3">
             <Breadcrumbs items={data.breadcrumbs} onNavigate={navigateToFolder} />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-10">
         <FolderBrowser
           folders={data.folders}
           assets={data.assets}
@@ -127,7 +128,7 @@ function PublicGalleryContent() {
         index={lightboxIndex}
         slides={slides}
       />
-    </div>
+    </AppShell>
   );
 }
 
@@ -135,9 +136,9 @@ export default function PublicGalleryPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">
+        <AppShell className="type-caption flex min-h-screen items-center justify-center">
           Loading gallery...
-        </div>
+        </AppShell>
       }
     >
       <PublicGalleryContent />

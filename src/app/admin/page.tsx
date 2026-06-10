@@ -57,16 +57,14 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">Clients</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          Manage client accounts and their banner campaigns
-        </p>
-      </div>
+      <header className="page-header">
+        <h1 className="page-header__title">Clients</h1>
+        <p className="page-header__subtitle">Manage client accounts and their banner campaigns</p>
+      </header>
 
       <Card>
         <CardHeader>
-          <h2 className="font-medium">New client</h2>
+          <h2 className="type-h2">New client</h2>
         </CardHeader>
         <CardBody>
           <form onSubmit={handleCreate} className="flex flex-col gap-3 sm:flex-row">
@@ -82,28 +80,28 @@ export default function AdminDashboardPage() {
             </Button>
           </form>
           {error && (
-            <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div className="alert-error mt-3">{error}</div>
           )}
         </CardBody>
       </Card>
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Loading clients...</p>
+        <p className="type-caption">Loading clients...</p>
       ) : clients.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center text-sm text-zinc-500">
+        <div className="empty-state">
           No clients yet. Create your first client above.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {clients.map((client) => (
             <Link key={client.id} href={`/admin/clients/${client.id}`}>
-              <Card className="transition hover:border-zinc-400 hover:shadow-md">
+              <Card className="transition hover:border-white/25 hover:bg-white/[0.08]">
                 <CardBody>
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-zinc-100">
-                    <FolderKanban className="h-6 w-6 text-zinc-600" />
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
+                    <FolderKanban className="h-6 w-6 text-white/70" />
                   </div>
-                  <h3 className="font-medium">{client.name}</h3>
-                  <p className="mt-1 text-sm text-zinc-500">
+                  <h3 className="type-h3">{client.name}</h3>
+                  <p className="type-caption mt-1">
                     {client._count.campaigns} campaign{client._count.campaigns === 1 ? "" : "s"}
                   </p>
                 </CardBody>

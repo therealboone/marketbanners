@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "@/components/app-shell";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,46 +60,47 @@ export default function SetupPage() {
 
   if (allowed === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-zinc-500">
+      <AppShell className="type-caption flex min-h-screen items-center justify-center">
         Loading...
-      </div>
+      </AppShell>
     );
   }
 
   if (!allowed) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <AppShell className="flex min-h-screen items-center justify-center px-4">
         <Card className="w-full max-w-md">
           <CardBody className="text-center">
             {error ? (
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="alert-error">{error}</p>
             ) : (
-              <p className="text-sm text-zinc-600">Setup has already been completed.</p>
+              <p className="type-body-sm">Setup has already been completed.</p>
             )}
-            <Link href="/login" className="mt-4 inline-block text-sm font-medium underline">
+            <Link href="/login" className="type-label mt-4 inline-block underline">
               Go to login
             </Link>
           </CardBody>
         </Card>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <AppShell className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-xl font-semibold">Initial Setup</h1>
-          <p className="mt-1 text-sm text-zinc-500">Create the first admin account</p>
+          <BrandLogo href={null} className="mb-4 h-8" priority />
+          <h1 className="type-h1">Initial Setup</h1>
+          <p className="type-caption mt-1">Create the first admin account</p>
         </CardHeader>
         <CardBody>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Your name</label>
+              <label className="type-label mb-1 block">Your name</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Email</label>
+              <label className="type-label mb-1 block">Email</label>
               <Input
                 type="email"
                 value={email}
@@ -106,7 +109,7 @@ export default function SetupPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Password</label>
+              <label className="type-label mb-1 block">Password</label>
               <Input
                 type="password"
                 value={password}
@@ -116,7 +119,7 @@ export default function SetupPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Setup secret</label>
+              <label className="type-label mb-1 block">Setup secret</label>
               <Input
                 type="password"
                 value={setupSecret}
@@ -127,7 +130,7 @@ export default function SetupPage() {
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+              <div className="alert-error">{error}</div>
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
@@ -136,6 +139,6 @@ export default function SetupPage() {
           </form>
         </CardBody>
       </Card>
-    </div>
+    </AppShell>
   );
 }

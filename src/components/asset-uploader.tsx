@@ -108,8 +108,8 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
       <label
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 transition ${
           dragging
-            ? "border-zinc-500 bg-zinc-100"
-            : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100"
+            ? "border-white/40 bg-white/10"
+            : "border-white/20 bg-white/[0.03] hover:border-white/30 hover:bg-white/[0.06]"
         }`}
         onDragEnter={(event) => {
           preventFileDropDefaults(event);
@@ -129,11 +129,11 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
           }
         }}
       >
-        <Upload className="mb-2 h-8 w-8 text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-700">
+        <Upload className="mb-2 h-8 w-8 text-white/40" />
+        <span className="type-label">
           {uploading ? "Uploading..." : "Click or drop images to upload"}
         </span>
-        <span className="mt-1 text-xs text-zinc-500">PNG, JPG, GIF, WebP — max 4 MB</span>
+        <span className="type-caption mt-1">PNG, JPG, GIF, WebP — max 4 MB</span>
         <input
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp"
@@ -148,14 +148,14 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
       </label>
 
       {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="alert-error">{error}</div>
       )}
 
       {assets.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {assets.map((asset) => (
-            <div key={asset.id} className="overflow-hidden rounded-lg border border-zinc-200">
-              <div className="flex h-32 items-center justify-center bg-zinc-100">
+            <div key={asset.id} className="glass-card overflow-hidden">
+              <div className="flex h-32 items-center justify-center bg-black/20">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={asset.url}
@@ -165,8 +165,8 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
               </div>
               <div className="flex items-start justify-between gap-2 p-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{asset.filename}</p>
-                  <p className="text-xs text-zinc-500">{formatBytes(asset.fileSize)}</p>
+                  <p className="type-h3 truncate">{asset.filename}</p>
+                  <p className="type-caption">{formatBytes(asset.fileSize)}</p>
                 </div>
                 <Button
                   variant="ghost"

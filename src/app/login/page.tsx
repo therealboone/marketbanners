@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "@/components/app-shell";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,15 +47,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <AppShell className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-xl font-semibold">Banner Portal</h1>
-          <p className="mt-1 text-sm text-zinc-500">Sign in to manage client campaigns</p>
+          <BrandLogo href={null} className="mb-4 h-8" priority />
+          <h1 className="type-h1">Banner Portal</h1>
+          <p className="type-caption mt-1">Sign in to manage client campaigns</p>
         </CardHeader>
         <CardBody>
           {needsSetup && (
-            <div className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div className="alert-warning mb-4">
               First time here?{" "}
               <Link href="/setup" className="font-medium underline">
                 Complete initial setup
@@ -63,7 +66,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">Email</label>
+              <label className="type-label mb-1 block">Email</label>
               <Input
                 type="email"
                 value={email}
@@ -73,7 +76,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Password</label>
+              <label className="type-label mb-1 block">Password</label>
               <Input
                 type="password"
                 value={password}
@@ -84,7 +87,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+              <div className="alert-error">{error}</div>
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
@@ -93,6 +96,6 @@ export default function LoginPage() {
           </form>
         </CardBody>
       </Card>
-    </div>
+    </AppShell>
   );
 }

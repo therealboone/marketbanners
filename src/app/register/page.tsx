@@ -1,5 +1,7 @@
 "use client";
 
+import { AppShell } from "@/components/app-shell";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -56,14 +58,14 @@ function RegisterForm() {
   }
 
   if (valid === null) {
-    return <div className="text-sm text-zinc-500">Validating invite...</div>;
+    return <div className="type-caption">Validating invite...</div>;
   }
 
   if (!valid) {
     return (
       <div className="text-center">
-        <p className="text-sm text-zinc-600">This invite link is invalid or has expired.</p>
-        <Link href="/login" className="mt-4 inline-block text-sm font-medium underline">
+        <p className="type-body-sm">This invite link is invalid or has expired.</p>
+        <Link href="/login" className="type-label mt-4 inline-block underline">
           Back to login
         </Link>
       </div>
@@ -73,15 +75,15 @@ function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium">Email</label>
+        <label className="type-label mb-1 block">Email</label>
         <Input value={email ?? ""} disabled />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Your name</label>
+        <label className="type-label mb-1 block">Your name</label>
         <Input value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Password</label>
+        <label className="type-label mb-1 block">Password</label>
         <Input
           type="password"
           value={password}
@@ -92,7 +94,7 @@ function RegisterForm() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="alert-error">{error}</div>
       )}
 
       <Button type="submit" className="w-full" disabled={loading}>
@@ -104,18 +106,19 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <AppShell className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-xl font-semibold">Join the team</h1>
-          <p className="mt-1 text-sm text-zinc-500">Complete your account setup</p>
+          <BrandLogo href={null} className="mb-4 h-8" priority />
+          <h1 className="type-h1">Join the team</h1>
+          <p className="type-caption mt-1">Complete your account setup</p>
         </CardHeader>
         <CardBody>
-          <Suspense fallback={<div className="text-sm text-zinc-500">Loading...</div>}>
+          <Suspense fallback={<div className="type-caption">Loading...</div>}>
             <RegisterForm />
           </Suspense>
         </CardBody>
       </Card>
-    </div>
+    </AppShell>
   );
 }

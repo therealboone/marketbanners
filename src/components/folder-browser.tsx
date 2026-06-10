@@ -32,11 +32,7 @@ export function FolderBrowser({
   emptyMessage = "This folder is empty.",
 }: Props) {
   if (folders.length === 0 && assets.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-12 text-center text-sm text-zinc-500">
-        {emptyMessage}
-      </div>
-    );
+    return <div className="empty-state">{emptyMessage}</div>;
   }
 
   return (
@@ -46,13 +42,13 @@ export function FolderBrowser({
           key={folder.id}
           type="button"
           onClick={() => onOpenFolder(folder.id)}
-          className="group rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-zinc-400 hover:shadow-sm"
+          className="glass-card group p-4 text-left transition hover:border-white/25 hover:bg-white/[0.08]"
         >
-          <div className="mb-3 flex h-24 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-            <Folder className="h-10 w-10" />
+          <div className="mb-3 flex h-24 items-center justify-center rounded-xl bg-white/5">
+            <Folder className="h-10 w-10 text-[var(--accent-purple)]" />
           </div>
-          <p className="truncate font-medium text-zinc-900">{folder.name}</p>
-          <p className="mt-1 text-xs text-zinc-500">
+          <p className="type-h3 truncate">{folder.name}</p>
+          <p className="type-caption mt-1">
             {(folder._count?.children ?? 0) + (folder._count?.assets ?? 0)} items
           </p>
         </button>
@@ -63,9 +59,9 @@ export function FolderBrowser({
           key={asset.id}
           type="button"
           onClick={() => onOpenAsset(index)}
-          className="group overflow-hidden rounded-xl border border-zinc-200 bg-white text-left transition hover:border-zinc-400 hover:shadow-sm"
+          className="glass-card group overflow-hidden text-left transition hover:border-white/25 hover:bg-white/[0.08]"
         >
-          <div className="relative flex h-40 items-center justify-center bg-zinc-100">
+          <div className="relative flex h-40 items-center justify-center bg-black/20">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={asset.url}
@@ -74,9 +70,9 @@ export function FolderBrowser({
             />
           </div>
           <div className="p-3">
-            <p className="truncate text-sm font-medium text-zinc-900">{asset.filename}</p>
+            <p className="type-h3 truncate">{asset.filename}</p>
             {asset.width && asset.height && (
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="type-caption mt-1">
                 {asset.width} × {asset.height}
               </p>
             )}

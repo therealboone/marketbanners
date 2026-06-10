@@ -74,11 +74,11 @@ export default function ClientDetailPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500">Loading...</p>;
+    return <p className="type-caption">Loading...</p>;
   }
 
   if (!client) {
-    return <p className="text-sm text-red-600">Client not found</p>;
+    return <p className="alert-error inline-block">Client not found</p>;
   }
 
   return (
@@ -86,18 +86,18 @@ export default function ClientDetailPage() {
       <div>
         <Link
           href="/admin"
-          className="mb-4 inline-flex items-center text-sm text-zinc-500 hover:text-zinc-900"
+          className="type-caption mb-4 inline-flex items-center text-white/50 hover:text-white"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           All clients
         </Link>
-        <h1 className="text-2xl font-semibold">{client.name}</h1>
-        <p className="mt-1 text-sm text-zinc-500">Campaigns and banner folders</p>
+        <h1 className="page-header__title">{client.name}</h1>
+        <p className="page-header__subtitle">Campaigns and banner folders</p>
       </div>
 
       <Card>
         <CardHeader>
-          <h2 className="font-medium">New campaign</h2>
+          <h2 className="type-h2">New campaign</h2>
         </CardHeader>
         <CardBody>
           <form onSubmit={handleCreate} className="flex flex-col gap-3 sm:flex-row">
@@ -113,13 +113,13 @@ export default function ClientDetailPage() {
             </Button>
           </form>
           {error && (
-            <div className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            <div className="alert-error mt-3">{error}</div>
           )}
         </CardBody>
       </Card>
 
       {client.campaigns.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center text-sm text-zinc-500">
+        <div className="empty-state">
           No campaigns yet.
         </div>
       ) : (
@@ -128,17 +128,17 @@ export default function ClientDetailPage() {
             <Card key={campaign.id}>
               <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                    <Megaphone className="h-5 w-5 text-blue-600" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                    <Megaphone className="h-5 w-5 text-[var(--accent-blue)]" />
                   </div>
                   <div>
                     <Link
                       href={`/admin/clients/${clientId}/campaigns/${campaign.id}`}
-                      className="font-medium hover:underline"
+                      className="type-h3 hover:underline"
                     >
                       {campaign.name}
                     </Link>
-                    <p className="mt-1 text-xs text-zinc-500">/g/{client.slug}/{campaign.slug}</p>
+                    <p className="type-caption mt-1">/g/{client.slug}/{campaign.slug}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">

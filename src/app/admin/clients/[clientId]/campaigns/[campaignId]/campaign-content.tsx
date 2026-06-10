@@ -212,11 +212,11 @@ export default function CampaignPageContent() {
   }
 
   if (loading) {
-    return <p className="text-sm text-zinc-500">Loading...</p>;
+    return <p className="type-caption">Loading...</p>;
   }
 
   if (!campaign) {
-    return <p className="text-sm text-red-600">{error ?? "Campaign not found"}</p>;
+    return <p className="alert-error inline-block">{error ?? "Campaign not found"}</p>;
   }
 
   const uploadUrl = folderId
@@ -228,14 +228,14 @@ export default function CampaignPageContent() {
       <div>
         <Link
           href={`/admin/clients/${clientId}`}
-          className="mb-4 inline-flex items-center text-sm text-zinc-500 hover:text-zinc-900"
+          className="type-caption mb-4 inline-flex items-center text-white/50 hover:text-white"
         >
           <ArrowLeft className="mr-1 h-4 w-4" />
           {campaign.client.name}
         </Link>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">{campaign.name}</h1>
+            <h1 className="page-header__title">{campaign.name}</h1>
             <Breadcrumbs items={breadcrumbs} onNavigate={navigateToFolder} />
           </div>
           <Button variant="secondary" size="sm" onClick={copyPublicUrl}>
@@ -246,12 +246,12 @@ export default function CampaignPageContent() {
       </div>
 
       {error && (
-        <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className="alert-error">{error}</div>
       )}
 
       <Card>
         <CardHeader>
-          <h2 className="font-medium">New folder</h2>
+          <h2 className="type-h2">New folder</h2>
         </CardHeader>
         <CardBody className="space-y-4">
           <form onSubmit={handleCreateFolder} className="flex flex-col gap-3 sm:flex-row">
@@ -271,7 +271,7 @@ export default function CampaignPageContent() {
               <Layers className="mr-2 h-4 w-4" />
               {creatingSizes ? "Creating..." : "Add standard size folders"}
             </Button>
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="type-caption mt-2">
               Creates 160×600, 300×50, 300×250, 300×600, 320×50, 336×280, and 728×90 folders
             </p>
           </div>
@@ -281,7 +281,7 @@ export default function CampaignPageContent() {
       {folderId && uploadUrl && (
         <Card>
           <CardHeader>
-            <h2 className="font-medium">Upload banners</h2>
+            <h2 className="type-h2">Upload banners</h2>
           </CardHeader>
           <CardBody>
             <AssetUploader
@@ -295,10 +295,10 @@ export default function CampaignPageContent() {
       )}
 
       <div>
-        <h2 className="mb-4 font-medium">{folderId ? folder?.name : "Campaign folders"}</h2>
+        <h2 className="type-h2 mb-4">{folderId ? folder?.name : "Campaign folders"}</h2>
 
         {folders.length === 0 && (!folderId || assets.length === 0) ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center text-sm text-zinc-500">
+          <div className="empty-state">
             {folderId
               ? "No subfolders or images in this folder yet."
               : "No folders yet. Create your first folder above."}
