@@ -138,7 +138,7 @@ async function restRequest(
   const response = await fetch(url, {
     method,
     headers,
-    body: body ?? undefined,
+    body: body ? new Uint8Array(body) : undefined,
   });
 
   if (!response.ok) {
