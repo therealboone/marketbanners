@@ -125,6 +125,13 @@ async function parseRestError(response: Response): Promise<string> {
   return detail;
 }
 
+function bufferToBodyInit(buffer: Buffer): BodyInit {
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
+}
+
 async function restRequest(
   method: "PUT" | "DELETE" | "GET",
   url: string,
@@ -143,10 +150,12 @@ async function restRequest(
     headers["Content-Type"] = contentType;
   }
 
+  const requestBody: BodyInit | undefined = body ? bufferToBodyInit(body) : undefined;
+
   const response = await fetch(url, {
     method,
     headers,
-    body: body ? new Uint8Array(body) : undefined,
+    body: requestBody,
   });
 
   if (!response.ok) {
