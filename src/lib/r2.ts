@@ -13,6 +13,14 @@ function env(name: string): string | undefined {
 
 type R2Transport = "rest" | "s3";
 
+type R2Diagnostics = {
+  bucketName: string;
+  endpoint: string;
+  transport: R2Transport;
+  headBucket: "ok" | "denied" | "not_found" | "error";
+  putObject: "ok" | "denied" | "error";
+};
+
 function getR2Transport(): R2Transport {
   return env("CLOUDFLARE_API_TOKEN") ? "rest" : "s3";
 }
@@ -265,21 +273,15 @@ function isTlsHandshakeFailure(err: unknown): boolean {
 async function testR2ConnectionViaRest(): Promise<{
   ok: boolean;
   error?: string;
-  diagnostics?: {
-    bucketName: string;
-    endpoint: string;
-    transport: R2Transport;
-    headBucket: "ok" | "denied" | "not_found" | "error";
-    putObject: "ok" | "denied" | "error";
-  };
+  diagnostics?: R2Diagnostics;
 }> {
   const bucket = env("R2_BUCKET_NAME")!;
-  const diagnostics = {
+  const diagnostics: R2Diagnostics = {
     bucketName: bucket,
     endpoint: "https://api.cloudflare.com/client/v4",
-    transport: "rest" as const,
-    headBucket: "error" as const,
-    putObject: "error" as const,
+    transport: "rest",
+    headBucket: "error",
+    putObject: "error",
   };
 
   try {
@@ -331,13 +333,7 @@ async function testR2ConnectionViaRest(): Promise<{
 export async function testR2Connection(): Promise<{
   ok: boolean;
   error?: string;
-  diagnostics?: {
-    bucketName: string;
-    endpoint: string;
-    transport: R2Transport;
-    headBucket: "ok" | "denied" | "not_found" | "error";
-    putObject: "ok" | "denied" | "error";
-  };
+  diagnostics?: R2Diagnostics;
 }> {
   const transport = getR2Transport();
   const config = getR2ConfigStatus();
@@ -366,12 +362,12 @@ export async function testR2Connection(): Promise<{
   const bucket = env("R2_BUCKET_NAME")!;
   const endpoint = getR2Endpoint();
   const client = getR2Client();
-  const diagnostics = {
+  const diagnostics: R2Diagnostics = {
     bucketName: bucket,
     endpoint,
-    transport: "s3" as const,
-    headBucket: "error" as const,
-    putObject: "error" as const,
+    transport: "s3",
+    headBucket: "error",
+    putObject: "error",
   };
 
   try {
