@@ -81,8 +81,12 @@ function getR2Client() {
 }
 
 function encodeObjectKeyForRestApi(storageKey: string): string {
-  // Cloudflare's API gateway treats extra path segments as invalid routes.
-  // Encode the full key as one path segment (slashes become %2F).
+  // REST routing requires a single path segment — storage keys must not contain "/".
+  if (storageKey.includes("/")) {
+    throw new Error(
+      "R2 REST API requires flat storage keys without slashes. Re-upload affected assets.",
+    );
+  }
   return encodeURIComponent(storageKey);
 }
 
@@ -240,6 +244,10 @@ export function formatR2Error(err: unknown): string {
     const endpoint = getR2ConfigStatus().endpoint ?? "your R2 S3 endpoint";
     return `R2 S3 endpoint TLS handshake failed (${endpoint}). Add CLOUDFLARE_API_TOKEN to Vercel to use Cloudflare's REST API instead, or contact Cloudflare support to fix the S3 endpoint for your account.`;
   }
+  if (message.includes("Could not route to")) {
+    const accountId = env("R2_ACCOUNT_ID");
+    return `R2 REST API routing failed. Verify R2_ACCOUNT_ID (${accountId ?? "missing"}) matches the Account ID on Cloudflare → R2 → Overview, and that CLOUDFLARE_API_TOKEN is an Account API token with Workers R2 Storage → Edit (User tokens may not work for R2 REST).`;
+  }
 
   return `R2 upload failed: ${message}`;
 }
@@ -308,9 +316,15 @@ async function enrichRestDiagnostics(diagnostics: R2Diagnostics): Promise<void> 
       diagnostics.headBucket = "ok";
     } else if (diagnostics.availableBuckets.length > 0) {
       diagnostics.headBucket = "not_found";
+    } else {
+      diagnostics.headBucket = "not_found";
     }
-  } catch {
+  } catch (err) {
     diagnostics.headBucket = "skipped";
+    diagnostics.availableBuckets = [];
+    if (isAccessDenied(err)) {
+      diagnostics.headBucket = "denied";
+    }
   }
 }
 
@@ -328,7 +342,7 @@ async function testR2ConnectionViaRest(): Promise<{
     putObject: "error",
   };
 
-  const key = `.__healthcheck/${Date.now()}`;
+  const key = `healthcheck-${Date.now()}.txt`;
 
   try {
     await uploadObjectViaRest(key, Buffer.from("ok"), "text/plain");
@@ -508,5 +522,6 @@ export function buildStorageKey(
   filename: string,
 ): string {
   const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return `${clientSlug}/${campaignSlug}/${folderId}/${Date.now()}-${safeName}`;
+  // Flat key (no slashes) — required for Cloudflare REST API routing on this account.
+  return `${clientSlug}__${campaignSlug}__${folderId}__${Date.now()}-${safeName}`;
 }
