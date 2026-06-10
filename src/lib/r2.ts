@@ -79,8 +79,10 @@ function getR2Client() {
   });
 }
 
-function encodeObjectKey(storageKey: string): string {
-  return storageKey.split("/").map(encodeURIComponent).join("/");
+function encodeObjectKeyForRestApi(storageKey: string): string {
+  // Cloudflare's API gateway treats extra path segments as invalid routes.
+  // Encode the full key as one path segment (slashes become %2F).
+  return encodeURIComponent(storageKey);
 }
 
 function restObjectUrl(storageKey: string): string {
@@ -93,7 +95,7 @@ function restObjectUrl(storageKey: string): string {
     throw new Error("R2_BUCKET_NAME is not configured");
   }
 
-  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKey(storageKey)}`;
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKeyForRestApi(storageKey)}`;
 }
 
 function restBucketUrl(): string {
@@ -318,7 +320,7 @@ async function testR2ConnectionViaRest(): Promise<{
     return { ok: false, error: formatR2Error(err), diagnostics };
   }
 
-  const key = `.__healthcheck-${Date.now()}`;
+  const key = `.__healthcheck/${Date.now()}`;
 
   try {
     await uploadObjectViaRest(key, Buffer.from("ok"), "text/plain");
