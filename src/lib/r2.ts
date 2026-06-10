@@ -17,8 +17,9 @@ type R2Diagnostics = {
   bucketName: string;
   endpoint: string;
   transport: R2Transport;
-  headBucket: "ok" | "denied" | "not_found" | "error";
+  headBucket: "ok" | "denied" | "not_found" | "error" | "skipped";
   putObject: "ok" | "denied" | "error";
+  availableBuckets?: string[];
 };
 
 function getR2Transport(): R2Transport {
@@ -98,17 +99,47 @@ function restObjectUrl(storageKey: string): string {
   return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}/objects/${encodeObjectKeyForRestApi(storageKey)}`;
 }
 
-function restBucketUrl(): string {
+function restAccountUrl(path: string): string {
   const accountId = env("R2_ACCOUNT_ID");
-  const bucket = env("R2_BUCKET_NAME");
   if (!accountId) {
     throw new Error("R2_ACCOUNT_ID is not configured");
   }
-  if (!bucket) {
-    throw new Error("R2_BUCKET_NAME is not configured");
+
+  return `https://api.cloudflare.com/client/v4/accounts/${accountId}${path}`;
+}
+
+function getRestAuthHeaders(contentType?: string): Record<string, string> {
+  const token = env("CLOUDFLARE_API_TOKEN");
+  if (!token) {
+    throw new Error("CLOUDFLARE_API_TOKEN is not configured");
   }
 
-  return `https://api.cloudflare.com/client/v4/accounts/${accountId}/r2/buckets/${encodeURIComponent(bucket)}`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  if (contentType) {
+    headers["Content-Type"] = contentType;
+  }
+  return headers;
+}
+
+async function listRestBucketNames(): Promise<string[]> {
+  const response = await fetch(restAccountUrl("/r2/buckets"), {
+    method: "GET",
+    headers: getRestAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`R2 REST GET failed: ${await parseRestError(response)}`);
+  }
+
+  const data = (await response.json()) as {
+    result?: { buckets?: Array<{ name?: string }> };
+  };
+
+  return (data.result?.buckets ?? [])
+    .map((entry) => entry.name)
+    .filter((name): name is string => Boolean(name));
 }
 
 async function parseRestError(response: Response): Promise<string> {
@@ -140,23 +171,11 @@ async function restRequest(
   body?: Buffer,
   contentType?: string,
 ): Promise<void> {
-  const token = env("CLOUDFLARE_API_TOKEN");
-  if (!token) {
-    throw new Error("CLOUDFLARE_API_TOKEN is not configured");
-  }
-
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-  };
-  if (contentType) {
-    headers["Content-Type"] = contentType;
-  }
-
   const requestBody: BodyInit | undefined = body ? bufferToBodyInit(body) : undefined;
 
   const response = await fetch(url, {
     method,
-    headers,
+    headers: getRestAuthHeaders(contentType),
     body: requestBody,
   });
 
@@ -291,33 +310,41 @@ async function testR2ConnectionViaRest(): Promise<{
     bucketName: bucket,
     endpoint: "https://api.cloudflare.com/client/v4",
     transport: "rest",
-    headBucket: "error",
+    headBucket: "skipped",
     putObject: "error",
   };
 
   try {
-    await restRequest("GET", restBucketUrl());
-    diagnostics.headBucket = "ok";
-  } catch (err) {
-    const message = errorMessage(err);
-    if (message.includes("not found") || message.includes("10004")) {
+    const availableBuckets = await listRestBucketNames();
+    diagnostics.availableBuckets = availableBuckets;
+    if (!availableBuckets.includes(bucket)) {
       diagnostics.headBucket = "not_found";
+      const bucketList =
+        availableBuckets.length > 0
+          ? ` Available buckets: ${availableBuckets.join(", ")}.`
+          : " No buckets found in this account.";
       return {
         ok: false,
-        error: `R2 bucket "${bucket}" not found. Check R2_BUCKET_NAME and R2_ACCOUNT_ID.`,
+        error: `R2 bucket "${bucket}" not found in your Cloudflare account.${bucketList} Update R2_BUCKET_NAME in Vercel to match exactly.`,
         diagnostics,
       };
     }
+    diagnostics.headBucket = "ok";
+  } catch (err) {
+    const message = errorMessage(err);
     if (isAccessDenied(err)) {
       diagnostics.headBucket = "denied";
       return {
         ok: false,
-        error: `R2 access denied for bucket "${bucket}". Check CLOUDFLARE_API_TOKEN has Workers R2 Storage Edit permission.`,
+        error: `R2 access denied listing buckets. Check CLOUDFLARE_API_TOKEN has Account → Workers R2 Storage → Edit.`,
         diagnostics,
       };
     }
-    diagnostics.headBucket = "error";
-    return { ok: false, error: formatR2Error(err), diagnostics };
+    if (!message.includes("Could not route to")) {
+      diagnostics.headBucket = "error";
+      return { ok: false, error: formatR2Error(err), diagnostics };
+    }
+    diagnostics.headBucket = "skipped";
   }
 
   const key = `.__healthcheck/${Date.now()}`;
