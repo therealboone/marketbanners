@@ -300,6 +300,20 @@ function isTlsHandshakeFailure(err: unknown): boolean {
   );
 }
 
+async function enrichRestDiagnostics(diagnostics: R2Diagnostics): Promise<void> {
+  try {
+    diagnostics.availableBuckets = await listRestBucketNames();
+    const bucket = diagnostics.bucketName;
+    if (diagnostics.availableBuckets.includes(bucket)) {
+      diagnostics.headBucket = "ok";
+    } else if (diagnostics.availableBuckets.length > 0) {
+      diagnostics.headBucket = "not_found";
+    }
+  } catch {
+    diagnostics.headBucket = "skipped";
+  }
+}
+
 async function testR2ConnectionViaRest(): Promise<{
   ok: boolean;
   error?: string;
@@ -314,57 +328,35 @@ async function testR2ConnectionViaRest(): Promise<{
     putObject: "error",
   };
 
-  try {
-    const availableBuckets = await listRestBucketNames();
-    diagnostics.availableBuckets = availableBuckets;
-    if (!availableBuckets.includes(bucket)) {
-      diagnostics.headBucket = "not_found";
-      const bucketList =
-        availableBuckets.length > 0
-          ? ` Available buckets: ${availableBuckets.join(", ")}.`
-          : " No buckets found in this account.";
-      return {
-        ok: false,
-        error: `R2 bucket "${bucket}" not found in your Cloudflare account.${bucketList} Update R2_BUCKET_NAME in Vercel to match exactly.`,
-        diagnostics,
-      };
-    }
-    diagnostics.headBucket = "ok";
-  } catch (err) {
-    const message = errorMessage(err);
-    if (isAccessDenied(err)) {
-      diagnostics.headBucket = "denied";
-      return {
-        ok: false,
-        error: `R2 access denied listing buckets. Check CLOUDFLARE_API_TOKEN has Account → Workers R2 Storage → Edit.`,
-        diagnostics,
-      };
-    }
-    if (!message.includes("Could not route to")) {
-      diagnostics.headBucket = "error";
-      return { ok: false, error: formatR2Error(err), diagnostics };
-    }
-    diagnostics.headBucket = "skipped";
-  }
-
   const key = `.__healthcheck/${Date.now()}`;
 
   try {
     await uploadObjectViaRest(key, Buffer.from("ok"), "text/plain");
     diagnostics.putObject = "ok";
     await deleteObjectViaRest(key);
+    await enrichRestDiagnostics(diagnostics);
     return { ok: true, diagnostics };
   } catch (err) {
+    await enrichRestDiagnostics(diagnostics);
+
     if (isAccessDenied(err)) {
       diagnostics.putObject = "denied";
       return {
         ok: false,
-        error: `R2 can reach bucket "${bucket}" but write is denied. Check CLOUDFLARE_API_TOKEN permissions.`,
+        error: `R2 write denied for bucket "${bucket}". Check CLOUDFLARE_API_TOKEN has Account → Workers R2 Storage → Edit.`,
         diagnostics,
       };
     }
+
     diagnostics.putObject = "error";
-    return { ok: false, error: formatR2Error(err), diagnostics };
+    let error = formatR2Error(err);
+    if (
+      diagnostics.headBucket === "not_found" &&
+      diagnostics.availableBuckets?.length
+    ) {
+      error += ` Available buckets in this account: ${diagnostics.availableBuckets.join(", ")}.`;
+    }
+    return { ok: false, error, diagnostics };
   }
 }
 
