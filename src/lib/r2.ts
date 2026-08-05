@@ -204,16 +204,16 @@ export function formatR2Error(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
 
   if (message.includes("R2_ACCOUNT_ID")) {
-    return "R2_ACCOUNT_ID is missing in Vercel environment variables.";
+    return "R2_ACCOUNT_ID is missing in environment variables.";
   }
   if (message.includes("R2_BUCKET_NAME")) {
-    return "R2_BUCKET_NAME is missing in Vercel environment variables.";
+    return "R2_BUCKET_NAME is missing in environment variables.";
   }
   if (message.includes("CLOUDFLARE_API_TOKEN")) {
     return "CLOUDFLARE_API_TOKEN is missing. Create a Cloudflare API token with Account → Workers R2 Storage → Edit permission.";
   }
   if (message.includes("access keys")) {
-    return "R2_ACCESS_KEY_ID or R2_SECRET_ACCESS_KEY is missing in Vercel.";
+    return "R2_ACCESS_KEY_ID or R2_SECRET_ACCESS_KEY is missing in environment variables.";
   }
   if (message.includes("NoSuchBucket") || message.includes("Bucket not found")) {
     return "R2 bucket not found. Check R2_BUCKET_NAME matches your bucket exactly.";
@@ -234,7 +234,7 @@ export function formatR2Error(err: unknown): string {
     if (getR2Transport() === "rest") {
       return `R2 access denied${bucketHint}. Check CLOUDFLARE_API_TOKEN has Account → Workers R2 Storage → Edit for this account.`;
     }
-    return `R2 access denied${bucketHint}. Usually the API token is scoped to a different bucket than R2_BUCKET_NAME, or Vercel still has access keys from an older token. Recreate the token for this exact bucket, update both keys in Vercel, and redeploy.`;
+    return `R2 access denied${bucketHint}. Usually the API token is scoped to a different bucket than R2_BUCKET_NAME, or the deploy still has access keys from an older token. Recreate the token for this exact bucket, update both keys, and redeploy.`;
   }
   if (
     message.includes("EPROTO") ||
@@ -242,7 +242,7 @@ export function formatR2Error(err: unknown): string {
     message.includes("SSL alert number 40")
   ) {
     const endpoint = getR2ConfigStatus().endpoint ?? "your R2 S3 endpoint";
-    return `R2 S3 endpoint TLS handshake failed (${endpoint}). Add CLOUDFLARE_API_TOKEN to Vercel to use Cloudflare's REST API instead, or contact Cloudflare support to fix the S3 endpoint for your account.`;
+    return `R2 S3 endpoint TLS handshake failed (${endpoint}). Add CLOUDFLARE_API_TOKEN to use Cloudflare's REST API instead, or contact Cloudflare support to fix the S3 endpoint for your account.`;
   }
   if (message.includes("Could not route to")) {
     const accountId = env("R2_ACCOUNT_ID");
@@ -431,7 +431,7 @@ export async function testR2Connection(): Promise<{
       diagnostics.headBucket = "denied";
       return {
         ok: false,
-        error: `R2 access denied for bucket "${bucket}". The API token is likely scoped to a different bucket than R2_BUCKET_NAME in Vercel.`,
+        error: `R2 access denied for bucket "${bucket}". The API token is likely scoped to a different bucket than R2_BUCKET_NAME.`,
         diagnostics,
       };
     }
@@ -466,7 +466,7 @@ export async function testR2Connection(): Promise<{
       diagnostics.putObject = "denied";
       return {
         ok: false,
-        error: `R2 can reach bucket "${bucket}" but write is denied. Vercel may still be using access keys from an older token — update R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and redeploy.`,
+        error: `R2 can reach bucket "${bucket}" but write is denied. The deploy may still be using access keys from an older token — update R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY and redeploy.`,
         diagnostics,
       };
     }

@@ -80,7 +80,7 @@ export async function POST(
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
-      return NextResponse.json({ error: "File too large (max 4 MB)" }, { status: 400 });
+      return NextResponse.json({ error: "File too large (max 10 MB)" }, { status: 400 });
     }
 
     const widthRaw = formData.get("width");

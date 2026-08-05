@@ -5,9 +5,9 @@ Online portal for managing and sharing marketing banner assets with clients.
 ## Stack
 
 - **Next.js** — admin dashboard + public client gallery
-- **Neon Postgres** — free-tier database
+- **PostgreSQL** — Railway Postgres (production)
 - **Cloudflare R2** — image storage
-- **Vercel** — deployment
+- **Railway** — deployment
 
 ## Features
 
@@ -45,13 +45,16 @@ cd banner-portal
 npm install
 ```
 
-Requires **Node.js 20+** (Vercel uses Node 20 by default).
+Requires **Node.js 20+**.
 
-### 2. Create a Neon database (free)
+### 2. Database (local)
 
-1. Go to [neon.tech](https://neon.tech) and create a free account
-2. Create a new project
-3. Copy the connection string into `DATABASE_URL`
+For local development you can use:
+
+- Railway Postgres (public URL from the Postgres service), or
+- Local Postgres / [`npx prisma dev`](https://www.prisma.io/docs/postgres)
+
+Set `DATABASE_URL` in `.env`.
 
 ### 3. Configure Cloudflare R2
 
@@ -67,7 +70,7 @@ You already have R2. You'll need:
 
 **Enable public access** on the bucket (or attach a custom domain) so clients can view images in the gallery.
 
-**New bucket?** R2 API tokens can be scoped to specific buckets. If you switch buckets, create a **new** R2 API token with **Object Read & Write** permission for the new bucket name, update `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in Vercel, and redeploy. Updating `R2_BUCKET_NAME` alone is not enough if the token is scoped to the old bucket.
+**New bucket?** R2 API tokens can be scoped to specific buckets. If you switch buckets, create a **new** R2 API token with **Object Read & Write** permission for the new bucket name, update `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in Railway, and redeploy. Updating `R2_BUCKET_NAME` alone is not enough if the token is scoped to the old bucket.
 
 **Verify storage** after deploy: visit `/api/health/storage` — it runs a test upload and reports which bucket name is configured.
 
@@ -78,7 +81,11 @@ You already have R2. You'll need:
 ```json
 [
   {
-    "AllowedOrigins": ["http://localhost:3000", "https://your-domain.com"],
+    "AllowedOrigins": [
+      "http://localhost:3000",
+      "https://your-app.up.railway.app",
+      "https://your-domain.com"
+    ],
     "AllowedMethods": ["GET", "PUT"],
     "AllowedHeaders": ["*"],
     "MaxAgeSeconds": 3600
@@ -115,24 +122,77 @@ Open [http://localhost:3000/setup](http://localhost:3000/setup) to create the fi
 
 ---
 
-## Deploy to Vercel
+## Deploy to Railway
 
-1. Import [therealboone/marketbanners](https://github.com/therealboone/marketbanners) in [vercel.com](https://vercel.com)
-2. Add all environment variables from `.env.example`
-3. Set **Node.js version** to **20.x** in project settings
-4. Deploy
+This app deploys as a long-running Node service (`next start`) with Railway Postgres.
 
-### Run database migration (one time)
+### 1. Create the project
 
-After adding `DATABASE_URL` in Vercel, run migrations from your machine:
+1. Open [railway.app](https://railway.app) → **New Project**
+2. **Deploy from GitHub repo** → select [teamcornett/marketbanners](https://github.com/teamcornett/marketbanners)
+3. Add a database: **+ New** → **Database** → **PostgreSQL**
+
+### 2. Wire the app to Postgres
+
+On the **web service** → **Variables**:
+
+1. Add a **reference variable**: `DATABASE_URL` → `${{Postgres.DATABASE_URL}}`
+2. Add the rest from `.env.example` (copy values from Vercel if migrating):
+
+| Variable | Notes |
+|---|---|
+| `AUTH_SECRET` | Same value as production if you want existing sessions to keep working |
+| `SETUP_SECRET` | Required for `/setup` |
+| `NEXT_PUBLIC_APP_URL` | Railway domain first, then your custom domain |
+| `R2_*` / `CLOUDFLARE_API_TOKEN` | Keep existing R2 bucket — no re-upload needed |
+
+`railway.toml` already sets:
+
+- **Build:** `npm run build` (`prisma generate && next build`)
+- **Pre-deploy:** `npx prisma migrate deploy`
+- **Start:** `npm start`
+- **Health check:** `/api/health`
+
+### 3. Public URL
+
+1. Service → **Settings** → **Networking** → **Generate Domain**
+2. Set `NEXT_PUBLIC_APP_URL` to that URL (e.g. `https://marketbanners-production.up.railway.app`)
+3. Redeploy so share/invite links use the correct host
+
+### 4. R2 CORS
+
+Add the Railway URL (and custom domain) to the R2 bucket CORS `AllowedOrigins` list, then redeploy if needed.
+
+### 5. Smoke test
+
+- [ ] `GET /api/health` → 200
+- [ ] `GET /api/health/storage` → `ok: true`
+- [ ] `/login` works
+- [ ] Upload a banner
+- [ ] Public gallery `/g/{client}/{campaign}` loads
+
+If the database is empty, visit `/setup` once to create the admin account.
+
+### Migrate existing Neon data (optional)
+
+If production data still lives on Neon and you want it on Railway Postgres:
 
 ```bash
-DATABASE_URL="your-neon-connection-string" npm run db:deploy
+# Export from Neon (use the direct / non-pooler connection string)
+pg_dump "$NEON_DATABASE_URL" --no-owner --no-acl -F c -f neon.dump
+
+# Import into Railway (use the public DATABASE_URL from the Postgres service)
+pg_restore --clean --if-exists --no-owner --no-acl -d "$RAILWAY_DATABASE_URL" neon.dump
 ```
 
-Or paste the SQL from `prisma/migrations/20250609180000_init/migration.sql` into the Neon SQL editor.
+Then skip re-running setup if users already exist. R2 assets stay where they are — only DB rows move.
 
-After deploy, visit `https://your-domain.com/setup` once to create the admin account.
+### Cut over from Vercel
+
+1. Point your custom domain’s CNAME at Railway (Networking → Custom Domain)
+2. Update `NEXT_PUBLIC_APP_URL` to the custom domain and redeploy
+3. Confirm smoke tests on the production domain
+4. After 24–48 hours of stable traffic, disable or delete the Vercel project
 
 ---
 
@@ -154,6 +214,7 @@ The "Add standard size folders" button creates:
 
 ```
 banner-portal/
+├── railway.toml             # Railway build / migrate / healthcheck
 ├── prisma/schema.prisma     # Database models
 ├── src/
 │   ├── app/

@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({
       ok: false,
       hasDatabaseUrl: false,
-      database: "DATABASE_URL is not set in Vercel environment variables",
+      database: "DATABASE_URL is not set in environment variables",
     });
   }
 
@@ -40,7 +40,7 @@ export async function GET() {
       userCount,
       hint: hasUserTable
         ? null
-        : "Run migration SQL in the same Neon project/branch as DATABASE_URL",
+        : "Run `npx prisma migrate deploy` against this DATABASE_URL (Railway pre-deploy should do this automatically)",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -48,7 +48,7 @@ export async function GET() {
       ok: false,
       hasDatabaseUrl: true,
       database: "connection failed",
-      hint: "Use Neon's pooled connection string with ?sslmode=require",
+      hint: "Check DATABASE_URL points at Railway Postgres (or your local DB) and the service can reach it",
       error: message,
     });
   }

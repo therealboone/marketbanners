@@ -62,7 +62,7 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
           }
 
           if (file.size > MAX_UPLOAD_BYTES) {
-            throw new Error(`${file.name}: file too large (max 4 MB)`);
+            throw new Error(`${file.name}: file too large (max 10 MB)`);
           }
 
           let width: number | undefined;
@@ -133,7 +133,7 @@ export function AssetUploader({ uploadUrl, assets, onUploaded, onDeleted }: Prop
         <span className="type-label">
           {uploading ? "Uploading..." : "Click or drop images to upload"}
         </span>
-        <span className="type-caption mt-1">PNG, JPG, GIF, WebP — max 4 MB</span>
+        <span className="type-caption mt-1">PNG, JPG, GIF, WebP — max 10 MB</span>
         <input
           type="file"
           accept="image/png,image/jpeg,image/gif,image/webp"
